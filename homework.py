@@ -1,5 +1,6 @@
 import datetime as dt
 from typing import Optional
+DATE_FORMAT = '%d.%m.%Y'
 
 
 class Record:
@@ -7,14 +8,13 @@ class Record:
     amount: int
     comment: str
     date: Optional[str]
-    date_format = '%d.%m.%Y'
 
     def check_date(self) -> None:
         """Check date."""
         if type(self.date) == str:
             try:
                 self.date = (dt.datetime.strptime
-                             (self.date, self.date_format).date())
+                             (self.date, DATE_FORMAT).date())
             except ValueError:
                 self.date = dt.datetime.now().date()
                 print('Введен некорректный формат даты. '
@@ -60,23 +60,20 @@ class Calculator:
 
     def get_today_stats(self) -> int:
         """Sum per day."""
-        sum_today = 0
         day_naw = dt.datetime.now().date()
-        for record in self.records:
-            if record.date == day_naw:
-                sum_today += record.amount
-        return sum_today
+        return sum([i.amount for i in self.records if i.date == day_naw])
+
+    def get_limit_dotay(self) -> int:
+        """Calculate the daily limit."""
+        return self.limit - self.get_today_stats()
 
     def get_week_stats(self) -> int:
         """Sum per week."""
-        sum_week = 0
         seven_days = dt.timedelta(days=7)
         day_naw = dt.datetime.now().date()
         last_week = day_naw - seven_days
-        for record in self.records:
-            if (record.date >= last_week and record.date <= day_naw):
-                sum_week += record.amount
-        return sum_week
+        return sum([i.amount for i in self.records
+                    if i.date >= last_week and i.date <= day_naw])
 
 
 class CaloriesCalculator(Calculator):
@@ -84,49 +81,39 @@ class CaloriesCalculator(Calculator):
 
     def get_calories_remained(self) -> str:
         """Returns information about consumed colories for the day."""
-        today_calories = self.limit - self.get_today_stats()
-        if today_calories > 0:
-            return (f'Сегодня можно съесть что-нибудь ещё, '
-                    f'но с общей калорийностью не более {today_calories} кКал')
+        if self.get_limit_dotay() > 0:
+            return ('Сегодня можно съесть что-нибудь ещё, '
+                    'но с общей калорийностью не более '
+                    f'{self.get_limit_dotay()} кКал')
         return 'Хватит есть!'
 
 
 class CashCalculator(Calculator):
     """Daily spending calculator with currency selection."""
+    POSITIVE_BALANCE = 'На сегодня осталось {balance} {currency}'
+    NEGATIVE_BALANCE = 'Денег нет, держись: твой долг - {balance} {currency}'
     USD_RATE = 60.0                             # Чтобы пройти тестирование
     EURO_RATE = 70.0                            # Чтобы пройти тестирование
-    currencies = {'usd': USD_RATE,
-                  'eur': EURO_RATE,
-                  'rub': 1.00}
-    name_currencies = {'usd': 'USD',
-                       'eur': 'Euro',
-                       'rub': 'руб'}
+    currencies = {'usd': ('USD', USD_RATE),
+                  'eur': ('Euro', EURO_RATE),
+                  'rub': ('руб', 1)}
 
-    def check_currency(self) -> float:
+    def check_currency(self):
         """Check currency."""
         if self.currency not in self.currencies:
             self.currency = 'rub'
             print('Валюта задана некорректна. Утановлена валюта руб')
-            return 1                                # Чтобы пройти тестирование
-        else:                                       # Чтобы пройти тестирование
-            if self.currency == 'rub':              # Чтобы пройти тестирование
-                return 1                            # Чтобы пройти тестирование
-            elif self.currency == 'eur':            # Чтобы пройти тестирование
-                return self.EURO_RATE               # Чтобы пройти тестирование
-            else:                                   # Чтобы пройти тестирование
-                return self.USD_RATE                # Чтобы пройти тестирование
 
-    def get_today_cash_remained(self, currency: str):
+    def get_today_cash_remained(self, currency: str) -> str:
         """Information about daily spending."""
-        self.currency = currency.lower()
-        today_waste = ((self.limit - self.get_today_stats())  # Тест не принял
-                       / self.check_currency())       # если делиш на dict[key]
-        if today_waste > 0:
-            return (f'На сегодня осталось '
-                    f'{today_waste:.2f} {self.name_currencies[self.currency]}')
-        elif today_waste == 0:
+        if self.get_limit_dotay() == 0:
             return 'Денег нет, держись'
         else:
-            today_waste = abs(today_waste)
-            return (f'Денег нет, держись: твой долг - '
-                    f'{today_waste:.2f} {self.name_currencies[self.currency]}')
+            self.currency = currency.lower()
+            self.check_currency()
+            waste_currency = (self.get_limit_dotay()
+                              / self.currencies[self.currency][1])
+            return (self.POSITIVE_BALANCE if waste_currency > 0
+                    else self.NEGATIVE_BALANCE).format(balance=round(abs(
+                        waste_currency), 2),
+                        currency=self.currencies[self.currency][0])

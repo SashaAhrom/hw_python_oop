@@ -1,5 +1,6 @@
 import datetime as dt
 from typing import Optional
+
 DATE_FORMAT = '%d.%m.%Y'
 
 
@@ -44,10 +45,12 @@ class Calculator:
 
     def check_limit(self) -> None:
         """Check limit."""
-        if type(self.limit) != int or self.limit < 0:
+        if type(self.limit) != (int or float) or self.limit < 0:
             self.limit = 0
             print('Введено некорректное значение лимита. '
                   'Установлено limit = 0')
+        else:
+            self.limit = int(self.limit)
 
     def __init__(self, limit: int) -> None:
         self.limit = limit
@@ -78,13 +81,14 @@ class Calculator:
 
 class CaloriesCalculator(Calculator):
     """Total daily calories consumption."""
+    TODAY_CALORIES = ('Сегодня можно съесть что-нибудь ещё, '
+                      'но с общей калорийностью не более '
+                      '{balance} кКал')
 
     def get_calories_remained(self) -> str:
         """Returns information about consumed colories for the day."""
         if self.get_limit_dotay() > 0:
-            return ('Сегодня можно съесть что-нибудь ещё, '
-                    'но с общей калорийностью не более '
-                    f'{self.get_limit_dotay()} кКал')
+            return self.TODAY_CALORIES.format(balance=self.get_limit_dotay())
         return 'Хватит есть!'
 
 
@@ -111,9 +115,8 @@ class CashCalculator(Calculator):
         else:
             self.currency = currency.lower()
             self.check_currency()
-            waste_currency = (self.get_limit_dotay()
-                              / self.currencies[self.currency][1])
+            name_currency, rate = self.currencies[self.currency]
+            waste_currency = self.get_limit_dotay() / rate
             return (self.POSITIVE_BALANCE if waste_currency > 0
                     else self.NEGATIVE_BALANCE).format(balance=round(abs(
-                        waste_currency), 2),
-                        currency=self.currencies[self.currency][0])
+                        waste_currency), 2), currency=name_currency)
